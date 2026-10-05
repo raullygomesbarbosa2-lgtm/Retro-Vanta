@@ -64,8 +64,6 @@ final class EmulatorView extends View {
     private float stickCenterX(int w) { return w*0.19f; }
     private float controlCenterY(int h) { return h*0.80f; }
     private float buttonRadius(int w,int h) { return Math.min(w*0.040f,h*0.105f); }
-    private float buttonAX(int w) { return w*0.91f; }
-    private float buttonBX(int w) { return w*0.80f; }
 
     private void drawController(Canvas canvas,int w,int h) {
         float cy=controlCenterY(h), sr=stickRadius(w,h), br=buttonRadius(w,h), sx=stickCenterX(w);
@@ -83,10 +81,12 @@ final class EmulatorView extends View {
         paint.setColor(0xfff5ffff); paint.setShadowLayer(12,0,0,0xffffffff); canvas.drawCircle(knobX,knobY,sr*0.40f,paint); paint.clearShadowLayer();
         paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(Math.max(2,sr*0.08f)); paint.setColor(0xff62e9ff); canvas.drawCircle(knobX,knobY,sr*0.40f,paint); paint.setStyle(Paint.Style.FILL);
 
-        drawActionButton(canvas,buttonBX(w),cy,br,0xff42ffb1,"B");
-        drawActionButton(canvas,buttonAX(w),cy,br,0xffff4fba,"A");
-        drawPill(canvas,w*0.455f,cy+br*1.32f,br*0.72f,br*0.26f,"SELECT");
-        drawPill(canvas,w*0.565f,cy+br*1.32f,br*0.72f,br*0.26f,"START");
+        drawActionButton(canvas,w*0.85f,cy-br*1.18f,br,0xff4b9cff,"X");
+        drawActionButton(canvas,w*0.78f,cy,br,0xff43ffb0,"Y");
+        drawActionButton(canvas,w*0.92f,cy,br,0xffff4fba,"A");
+        drawActionButton(canvas,w*0.85f,cy+br*1.18f,br,0xffffbd4a,"B");
+        drawPill(canvas,w*0.455f,cy+br*1.52f,br*0.72f,br*0.24f,"SELECT");
+        drawPill(canvas,w*0.565f,cy+br*1.52f,br*0.72f,br*0.24f,"START");
     }
 
     private void drawActionButton(Canvas canvas,float x,float y,float r,int color,String label) {
@@ -130,10 +130,10 @@ final class EmulatorView extends View {
                 if(Math.abs(dy)>sr*0.23f) bits|=dy>0?8:4;
                 continue;
             }
-            if(y>h*0.61f && near(x,y,buttonAX(w),cy,br*1.35f)) bits|=16;
-            else if(y>h*0.61f && near(x,y,buttonBX(w),cy,br*1.35f)) bits|=32;
-            else if(y>h*0.61f && near(x,y,w*0.455f,cy+br*1.32f,br*0.9f)) bits|=64;
-            else if(y>h*0.61f && near(x,y,w*0.565f,cy+br*1.32f,br*0.9f)) bits|=128;
+            if(y>h*0.61f && (near(x,y,w*0.92f,cy,br*1.25f)||near(x,y,w*0.85f,cy-br*1.18f,br*1.25f))) bits|=16;
+            else if(y>h*0.61f && (near(x,y,w*0.78f,cy,br*1.25f)||near(x,y,w*0.85f,cy+br*1.18f,br*1.25f))) bits|=32;
+            else if(y>h*0.61f && near(x,y,w*0.455f,cy+br*1.52f,br*0.85f)) bits|=64;
+            else if(y>h*0.61f && near(x,y,w*0.565f,cy+br*1.52f,br*0.85f)) bits|=128;
         }
         stickActive=activeStick;
         if(activeStick) { stickDx=newDx;stickDy=newDy; } else { stickDx=0;stickDy=0; }

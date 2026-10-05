@@ -8,10 +8,12 @@ final class GameBoyCore {
     private static final int[] SHADES = {0xffe5f3d1, 0xffa8c686, 0xff527a54, 0xff243b3b};
     private byte[] rom = new byte[0];
     private final byte[] vram = new byte[0x2000], wram = new byte[0x2000];
-    private final byte[] eram = new byte[0x8000], oam = new byte[0xa0], io = new byte[0x80];
-    private final int[] pixels = new int[WIDTH * HEIGHT];
+    private final byte[] eram = new byte[0x8000], mbc2ram = new byte[0x200], rtc = new byte[5];
+    private final byte[] oam = new byte[0xa0], io = new byte[0x80];
+    private final int[] pixels = new int[WIDTH * HEIGHT], bgColorIds = new int[WIDTH * HEIGHT];
     private int a, f, b, c, d, e, h, l, sp, pc;
     private int ie, romBank = 1, ramBank, mbcMode, ramEnabled, pressed, cyclesInFrame, mapperType;
+    private int mbc3Select, divCycles, timerCycles, ppuCycles, lastStatLine;
     private boolean ime, halted;
     private String cartridgeTitle = "Game Boy";
 
@@ -19,7 +21,10 @@ final class GameBoyCore {
         if (image == null || image.length < 0x150) throw new IllegalArgumentException("Arquivo pequeno ou inválido para uma ROM de Game Boy.");
         if (image.length > 8 * 1024 * 1024) throw new IllegalArgumentException("A ROM passa do limite inicial de 8 MB.");
         int cartridge = image[0x147] & 255;
-        if (cartridge != 0x00 && cartridge != 0x01 && cartridge != 0x02 && cartridge != 0x03)
+        boolean supported = cartridge==0x00 || (cartridge>=0x01 && cartridge<=0x03)
+                || cartridge==0x05 || cartridge==0x06 || (cartridge>=0x0f && cartridge<=0x13)
+                || (cartridge>=0x19 && cartridge<=0x1e);
+        if (!supported)
             throw new IllegalArgumentException(String.format("Controle de cartucho 0x%02X ainda não é compatível nesta versão.", cartridge));
         if ((image[0x143] & 255) == 0xc0)
             throw new IllegalArgumentException("Este jogo exige Game Boy Color; o núcleo colorido ainda não está pronto.");
@@ -29,8 +34,10 @@ final class GameBoyCore {
         Arrays.fill(vram, (byte) 0); Arrays.fill(wram, (byte) 0);
         Arrays.fill(eram, (byte) 0xff); Arrays.fill(oam, (byte) 0); Arrays.fill(io, (byte) 0);
         a=0x01; f=0xb0; b=0x00; c=0x13; d=0x00; e=0xd8; h=0x01; l=0x4d;
-        sp=0xfffe; pc=0x0100; ie=0; romBank=1; ramBank=0; mbcMode=0; ramEnabled=0; ime=false; halted=false;
-        io[0x00]=(byte)0xcf; io[0x40]=(byte)0x91; io[0x47]=(byte)0xfc;
+        sp=0xfffe; pc=0x0100; ie=0; romBank=1; ramBank=0; mbcMode=0; mbc3Select=0; ramEnabled=0; ime=false; halted=false;
+        divCycles=0; timerCycles=0; ppuCycles=0; lastStatLine=0; cyclesInFrame=0;
+        Arrays.fill(mbc2ram,(byte)0x0f); Arrays.fill(rtc,(byte)0);
+        io[0x00]=(byte)0xcf; io[0x40]=(byte)0x91; io[0x41]=(byte)0x80; io[0x44]=0; io[0x47]=(byte)0xfc;
         io[0x48]=(byte)0xff; io[0x49]=(byte)0xff; io[0x0f]=(byte)0xe1;
     }
 
@@ -47,18 +54,35 @@ final class GameBoyCore {
         return value.isEmpty() ? "Game Boy (sem título no cabeçalho)" : value;
     }
 
-    void setButtons(int bits) { pressed = bits & 0xff; }
+    void setButtons(int bits) {
+        int next=bits&0xff;
+        if ((next & ~pressed)!=0) io[0x0f]=(byte)((io[0x0f]&255)|0x10);
+        pressed=next;
+    }
 
     int[] frame() {
         int spent = 0, guard = 0;
-        while (spent < 70224 && guard++ < 50000) spent += step();
+        while (spent < 70224 && guard++ < 50000) {
+            int used=step(); spent+=used; tickHardware(used);
+        }
         cyclesInFrame += spent;
         drawBackground();
+        drawSprites();
         return pixels;
     }
 
     private int step() {
-        if (rom.length == 0 || halted) return 4;
+        if (rom.length == 0) return 4;
+        int pending=ie & (io[0x0f]&0x1f);
+        if (pending!=0) {
+            halted=false;
+            if (ime) {
+                int bit=0; while(bit<5 && (pending&(1<<bit))==0)bit++;
+                io[0x0f]=(byte)((io[0x0f]&255)&~(1<<bit));
+                ime=false; push(pc); pc=0x40+bit*8; return 20;
+            }
+        }
+        if (halted) return 4;
         int op = fetch();
         int x = op >>> 6, y = (op >>> 3) & 7, z = op & 7, p = y >>> 1, q = y & 1;
         if (x == 0) {
@@ -128,6 +152,51 @@ final class GameBoyCore {
         }
         return 4;
     }
+
+    private void tickHardware(int usedCycles) {
+        divCycles += usedCycles;
+        while (divCycles >= 256) { divCycles -= 256; io[0x04]=(byte)((io[0x04]+1)&255); }
+        int tac=io[0x07]&7;
+        if ((tac&4)!=0) {
+            int[] periods={1024,16,64,256};
+            timerCycles += usedCycles;
+            int period=periods[tac&3];
+            while(timerCycles>=period) {
+                timerCycles-=period;
+                int tima=io[0x05]&255;
+                if(tima==255) { io[0x05]=io[0x06]; requestInterrupt(2); }
+                else io[0x05]=(byte)(tima+1);
+            }
+        }
+        if ((io[0x40]&0x80)!=0) {
+            ppuCycles += usedCycles;
+            while(ppuCycles>=456) {
+                ppuCycles-=456;
+                int line=(io[0x44]&255)+1;
+                if(line==144) requestInterrupt(0);
+                if(line>=154) line=0;
+                io[0x44]=(byte)line;
+            }
+        } else { ppuCycles=0; io[0x44]=0; }
+        updateStat();
+    }
+
+    private void updateStat() {
+        int line=io[0x44]&255, stat=io[0x41]&0x78;
+        int mode;
+        if((io[0x40]&0x80)==0) mode=0;
+        else if(line>=144) mode=1;
+        else if(ppuCycles<80) mode=2;
+        else if(ppuCycles<252) mode=3;
+        else mode=0;
+        boolean lyc=line==(io[0x45]&255);
+        io[0x41]=(byte)(0x80|stat|mode|(lyc?4:0));
+        boolean irq=((mode==0&&(stat&8)!=0)||(mode==1&&(stat&0x10)!=0)||(mode==2&&(stat&0x20)!=0)||(lyc&&(stat&0x40)!=0));
+        if(irq&&lastStatLine==0) requestInterrupt(1);
+        lastStatLine=irq?1:0;
+    }
+
+    private void requestInterrupt(int bit) { io[0x0f]=(byte)((io[0x0f]&255)|(1<<bit)); }
 
     private int cb(int op) {
         int x=op>>>6, y=(op>>>3)&7, z=op&7, v=reg(z);
@@ -200,54 +269,122 @@ final class GameBoyCore {
 
     private int read(int addr) {
         addr &= 65535;
-        if(addr<0x4000) return addr<rom.length ? rom[addr]&255 : 0xff;
-        if(addr<0x8000) { int bank=romBank; int ix=bank*0x4000+(addr-0x4000); return ix<rom.length?rom[ix]&255:0xff; }
+        if(addr<0x4000) {
+            int bank=(mapperType>=1&&mapperType<=3&&mbcMode==1)?((ramBank&3)<<5):0;
+            int ix=bank*0x4000+addr; return ix<rom.length?rom[ix]&255:0xff;
+        }
+        if(addr<0x8000) {
+            int bank=mapperType==0?1:romBank;
+            int ix=bank*0x4000+(addr-0x4000); return ix<rom.length?rom[ix]&255:0xff;
+        }
         if(addr<0xa000) return vram[addr-0x8000]&255;
-        if(addr<0xc000) { if(ramEnabled==0)return 0xff; int ix=(ramBank*0x2000)+(addr-0xa000);return ix<eram.length?eram[ix]&255:0xff; }
+        if(addr<0xc000) {
+            if(ramEnabled==0)return 0xff;
+            if(mapperType==0x05||mapperType==0x06)return 0xf0|(mbc2ram[(addr-0xa000)&0x1ff]&15);
+            if((mapperType>=0x0f&&mapperType<=0x13)&&(mbc3Select>=8&&mbc3Select<=12))return rtc[mbc3Select-8]&255;
+            int selectedRam=(mapperType>=1&&mapperType<=3&&mbcMode==0)?0:ramBank;
+            int ix=(selectedRam*0x2000)+(addr-0xa000);return ix<eram.length?eram[ix]&255:0xff;
+        }
         if(addr<0xe000) return wram[addr-0xc000]&255;
         if(addr<0xfe00) return wram[addr-0xe000]&255;
         if(addr<0xfea0) return oam[addr-0xfe00]&255;
         if(addr<0xff00) return 0xff;
         if(addr==0xff00) { int select=io[0]&0x30, low=15; if((select&0x10)==0)low &= (~pressed)&15; if((select&0x20)==0)low &= (~(pressed>>>4))&15; return 0xc0|select|low; }
         if(addr==0xffff)return ie;
+        if(addr==0xff0f)return 0xe0|(io[0x0f]&0x1f);
         return io[addr-0xff00]&255;
     }
 
     private void write(int addr,int value) {
         addr &= 65535; value &= 255;
-        if(addr<0x2000) { if(rom.length>0x147 && (rom[0x147]&255)>=1 && (rom[0x147]&255)<=3) ramEnabled=(value&15)==10?1:0; return; }
-        if(addr<0x4000) { romBank=(romBank&0x60)|(value&31); if((romBank&31)==0)romBank++; return; }
-        if(addr<0x6000) { if(mbcMode==0)romBank=(romBank&31)|((value&3)<<5); else ramBank=value&3; return; }
-        if(addr<0x8000) { mbcMode=value&1; return; }
+        if(addr<0x2000) {
+            if(mapperType==0x05||mapperType==0x06) { if((addr&0x100)==0)ramEnabled=(value&15)==10?1:0; }
+            else if(mapperType!=0) ramEnabled=(value&15)==10?1:0;
+            return;
+        }
+        if(addr<0x4000) {
+            if(mapperType>=1&&mapperType<=3) { romBank=(romBank&0x60)|(value&31); if((romBank&31)==0)romBank++; }
+            else if(mapperType==0x05||mapperType==0x06) { if((addr&0x100)!=0) { romBank=value&15; if(romBank==0)romBank=1; } }
+            else if(mapperType>=0x0f&&mapperType<=0x13) { romBank=value&0x7f; if(romBank==0)romBank=1; }
+            else if(mapperType>=0x19&&mapperType<=0x1e) {
+                if(addr<0x3000)romBank=(romBank&0x100)|value; else romBank=(romBank&0xff)|((value&1)<<8);
+            }
+            return;
+        }
+        if(addr<0x6000) {
+            if(mapperType>=1&&mapperType<=3) { ramBank=value&3; romBank=(romBank&0x1f)|(ramBank<<5); }
+            else if(mapperType>=0x0f&&mapperType<=0x13) { mbc3Select=value; if(value<4)ramBank=value&3; }
+            else if(mapperType>=0x19&&mapperType<=0x1e)ramBank=value&15;
+            return;
+        }
+        if(addr<0x8000) { if(mapperType>=1&&mapperType<=3)mbcMode=value&1; return; }
         if(addr<0xa000) { vram[addr-0x8000]=(byte)value; return; }
-        if(addr<0xc000) { if(ramEnabled!=0) { int ix=ramBank*0x2000+addr-0xa000;if(ix<eram.length)eram[ix]=(byte)value; } return; }
+        if(addr<0xc000) {
+            if(ramEnabled!=0) {
+                if(mapperType==0x05||mapperType==0x06)mbc2ram[(addr-0xa000)&0x1ff]=(byte)(value&15);
+                else if((mapperType>=0x0f&&mapperType<=0x13)&&(mbc3Select>=8&&mbc3Select<=12))rtc[mbc3Select-8]=(byte)value;
+                else { int selectedRam=(mapperType>=1&&mapperType<=3&&mbcMode==0)?0:ramBank; int ix=selectedRam*0x2000+addr-0xa000;if(ix<eram.length)eram[ix]=(byte)value; }
+            }
+            return;
+        }
         if(addr<0xe000) { wram[addr-0xc000]=(byte)value; return; }
         if(addr<0xfe00) { wram[addr-0xe000]=(byte)value; return; }
         if(addr<0xfea0) { oam[addr-0xfe00]=(byte)value; return; }
         if(addr<0xff00)return;
         if(addr==0xffff) { ie=value;return; }
-        if(addr==0xff04) { io[4]=0;return; }
+        if(addr==0xff0f) { io[0x0f]=(byte)(0xe0|(value&0x1f));return; }
+        if(addr==0xff04) { io[4]=0;divCycles=0;return; }
+        if(addr==0xff05) { io[5]=(byte)value;timerCycles=0;return; }
+        if(addr==0xff41) { io[0x41]=(byte)((io[0x41]&7)|(value&0x78)|0x80);return; }
+        if(addr==0xff44) { return; }
         if(addr==0xff46) { io[0x46]=(byte)value;int base=value<<8;for(int i=0;i<160;i++)oam[i]=(byte)read((base+i)&65535);return; }
-        if(addr==0xff44) { io[0x44]=0;return; }
         io[addr-0xff00]=(byte)value;
     }
 
     private void drawBackground() {
         int lcdc=io[0x40]&255;
-        if((lcdc&0x80)==0) { Arrays.fill(pixels,SHADES[0]);return; }
-        int mapBase=(lcdc&8)!=0?0x1c00:0x1800;
         int palette=io[0x47]&255;
+        if((lcdc&0x80)==0 || (lcdc&1)==0) {
+            Arrays.fill(bgColorIds,0); Arrays.fill(pixels,SHADES[(palette&3)]); return;
+        }
+        int mapBase=(lcdc&8)!=0?0x1c00:0x1800, scx=io[0x43]&255, scy=io[0x42]&255;
         for(int y=0;y<HEIGHT;y++) for(int x=0;x<WIDTH;x++) {
-            int tileX=(x>>>3)&31, tileY=(y>>>3)&31;
+            int px=(x+scx)&255, py=(y+scy)&255;
+            int tileX=(px>>>3)&31, tileY=(py>>>3)&31;
             int tile=vram[mapBase+tileY*32+tileX]&255;
-            int dataAddr;
-            if((lcdc&0x10)!=0) dataAddr=tile*16;
-            else dataAddr=0x1000+(byte)tile*16;
-            int row=y&7, bit=7-(x&7);
+            int dataAddr=(lcdc&0x10)!=0?tile*16:0x1000+(byte)tile*16;
+            int row=py&7, bit=7-(px&7);
             int lo=vram[(dataAddr+row*2)&0x1fff]&255, hi=vram[(dataAddr+row*2+1)&0x1fff]&255;
             int color=((lo>>>bit)&1)|(((hi>>>bit)&1)<<1);
-            int shade=(palette >>> (color*2))&3;
-            pixels[y*WIDTH+x]=SHADES[shade];
+            bgColorIds[y*WIDTH+x]=color;
+            pixels[y*WIDTH+x]=SHADES[(palette >>> (color*2))&3];
+        }
+    }
+
+    private void drawSprites() {
+        int lcdc=io[0x40]&255;
+        if((lcdc&0x82)!=0x82) return;
+        int height=(lcdc&4)!=0?16:8;
+        for(int sprite=39;sprite>=0;sprite--) {
+            int base=sprite*4, top=(oam[base]&255)-16, left=(oam[base+1]&255)-8;
+            int tile=oam[base+2]&255, attr=oam[base+3]&255;
+            if(left<=-8||left>=WIDTH||top<=-height||top>=HEIGHT) continue;
+            for(int sy=0;sy<height;sy++) {
+                int y=top+sy; if(y<0||y>=HEIGHT)continue;
+                int row=(attr&0x40)!=0?height-1-sy:sy;
+                int tileNum=height==16?(tile&0xfe)+(row>>>3):tile;
+                row &= 7; int lo=vram[(tileNum*16+row*2)&0x1fff]&255, hi=vram[(tileNum*16+row*2+1)&0x1fff]&255;
+                for(int sx=0;sx<8;sx++) {
+                    int x=left+sx; if(x<0||x>=WIDTH)continue;
+                    int bit=(attr&0x20)!=0?sx:7-sx;
+                    int color=((lo>>>bit)&1)|(((hi>>>bit)&1)<<1);
+                    if(color==0)continue;
+                    int index=y*WIDTH+x;
+                    if((attr&0x80)!=0&&bgColorIds[index]!=0)continue;
+                    int pal=(attr&0x10)!=0?io[0x49]&255:io[0x48]&255;
+                    pixels[index]=SHADES[(pal>>>(color*2))&3];
+                }
+            }
         }
     }
 }
