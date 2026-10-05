@@ -11,11 +11,20 @@ final class GameBoyCore {
     private final byte[] eram = new byte[0x8000], oam = new byte[0xa0], io = new byte[0x80];
     private final int[] pixels = new int[WIDTH * HEIGHT];
     private int a, f, b, c, d, e, h, l, sp, pc;
-    private int ie, romBank = 1, ramBank, mbcMode, ramEnabled, pressed, cyclesInFrame;
+    private int ie, romBank = 1, ramBank, mbcMode, ramEnabled, pressed, cyclesInFrame, mapperType;
     private boolean ime, halted;
+    private String cartridgeTitle = "Game Boy";
 
     void load(byte[] image) {
-        if (image == null || image.length < 0x150) throw new IllegalArgumentException("ROM curta demais");
+        if (image == null || image.length < 0x150) throw new IllegalArgumentException("Arquivo pequeno ou inválido para uma ROM de Game Boy.");
+        if (image.length > 8 * 1024 * 1024) throw new IllegalArgumentException("A ROM passa do limite inicial de 8 MB.");
+        int cartridge = image[0x147] & 255;
+        if (cartridge != 0x00 && cartridge != 0x01 && cartridge != 0x02 && cartridge != 0x03)
+            throw new IllegalArgumentException(String.format("Controle de cartucho 0x%02X ainda não é compatível nesta versão.", cartridge));
+        if ((image[0x143] & 255) == 0xc0)
+            throw new IllegalArgumentException("Este jogo exige Game Boy Color; o núcleo colorido ainda não está pronto.");
+        mapperType = cartridge;
+        cartridgeTitle = readTitle(image);
         rom = Arrays.copyOf(image, image.length);
         Arrays.fill(vram, (byte) 0); Arrays.fill(wram, (byte) 0);
         Arrays.fill(eram, (byte) 0xff); Arrays.fill(oam, (byte) 0); Arrays.fill(io, (byte) 0);
@@ -23,6 +32,19 @@ final class GameBoyCore {
         sp=0xfffe; pc=0x0100; ie=0; romBank=1; ramBank=0; mbcMode=0; ramEnabled=0; ime=false; halted=false;
         io[0x00]=(byte)0xcf; io[0x40]=(byte)0x91; io[0x47]=(byte)0xfc;
         io[0x48]=(byte)0xff; io[0x49]=(byte)0xff; io[0x0f]=(byte)0xe1;
+    }
+
+    String getCartridgeTitle() { return cartridgeTitle; }
+
+    private String readTitle(byte[] image) {
+        StringBuilder title = new StringBuilder();
+        for (int i=0x134; i<0x144; i++) {
+            int ch=image[i]&255;
+            if (ch==0) break;
+            if (ch>=32 && ch<=126) title.append((char)ch);
+        }
+        String value=title.toString().trim();
+        return value.isEmpty() ? "Game Boy (sem título no cabeçalho)" : value;
     }
 
     void setButtons(int bits) { pressed = bits & 0xff; }

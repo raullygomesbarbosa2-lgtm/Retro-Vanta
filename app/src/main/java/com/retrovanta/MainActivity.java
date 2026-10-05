@@ -3,6 +3,8 @@ package com.retrovanta;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -14,45 +16,59 @@ import java.io.InputStream;
 
 public final class MainActivity extends Activity {
     private static final int OPEN_ROM = 41;
+    private static final int MAX_ROM_BYTES = 8 * 1024 * 1024;
     private EmulatorView emulatorView;
     private TextView status;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        getWindow().setNavigationBarColor(Color.rgb(5, 10, 32));
+        getWindow().setStatusBarColor(Color.rgb(5, 10, 32));
         getWindow().getDecorView().setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(12, 16, 26));
-        root.setPadding(12, 4, 12, 4);
+        root.setBackgroundColor(Color.rgb(5, 10, 32));
+        root.setPadding(dp(14), dp(4), dp(14), dp(4));
 
         TextView title = new TextView(this);
-        title.setText("RETRO VANTA  ·  DMG / PROTÓTIPO ORIGINAL");
-        title.setTextColor(Color.rgb(125, 255, 200));
+        title.setText("RETRO VANTA  /  DMG");
+        title.setTextColor(Color.rgb(65, 221, 255));
         title.setTextSize(18);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         title.setGravity(Gravity.CENTER_VERTICAL);
-        root.addView(title, new LinearLayout.LayoutParams(-1, 34));
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(30)));
 
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         Button open = new Button(this);
-        open.setText("ABRIR ROM GAME BOY");
+        open.setText("Abrir ROM de Game Boy");
+        open.setTextColor(Color.WHITE);
+        open.setTextSize(13);
+        GradientDrawable buttonBg = new GradientDrawable();
+        buttonBg.setColor(Color.rgb(13, 33, 71));
+        buttonBg.setCornerRadius(dp(12));
+        buttonBg.setStroke(dp(2), Color.rgb(36, 214, 255));
+        open.setBackground(buttonBg);
+        open.setPadding(dp(14), 0, dp(14), 0);
         open.setOnClickListener(v -> openRom());
-        bar.addView(open, new LinearLayout.LayoutParams(-2, 48));
+        bar.addView(open, new LinearLayout.LayoutParams(-2, dp(46)));
         status = new TextView(this);
-        status.setText("Escolha uma ROM .gb ou .gbc · protótipo experimental");
-        status.setTextColor(Color.LTGRAY);
-        status.setTextSize(13);
+        status.setText("ROMs .gb · núcleo experimental");
+        status.setTextColor(Color.rgb(179, 204, 240));
+        status.setTextSize(12);
         status.setGravity(Gravity.CENTER_VERTICAL);
-        status.setPadding(12, 0, 0, 0);
-        bar.addView(status, new LinearLayout.LayoutParams(0, 48, 1));
+        status.setPadding(dp(12), 0, 0, 0);
+        bar.addView(status, new LinearLayout.LayoutParams(0, dp(46), 1));
         root.addView(bar);
 
         emulatorView = new EmulatorView(this);
         root.addView(emulatorView, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
     }
+
+    private int dp(float value) { return (int)(value * getResources().getDisplayMetrics().density + 0.5f); }
 
     private void openRom() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -66,15 +82,21 @@ public final class MainActivity extends Activity {
         if (request != OPEN_ROM || result != RESULT_OK || data == null || data.getData() == null) return;
         try (InputStream in = getContentResolver().openInputStream(data.getData());
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            if (in == null) throw new IllegalStateException("Arquivo indisponível");
+            if (in == null) throw new IllegalArgumentException("Não consegui ler esse arquivo.");
             byte[] buffer = new byte[8192];
             int n;
-            while ((n = in.read(buffer)) != -1) out.write(buffer, 0, n);
+            while ((n = in.read(buffer)) != -1) {
+                if (out.size() + n > MAX_ROM_BYTES) throw new IllegalArgumentException("Arquivo acima de 8 MB; esta versão só aceita ROMs de Game Boy até esse tamanho.");
+                out.write(buffer, 0, n);
+            }
             byte[] rom = out.toByteArray();
             emulatorView.loadRom(rom);
-            status.setText("ROM carregada: " + rom.length + " bytes · compatibilidade inicial");
+            status.setText("Carregado: " + emulatorView.getRomTitle());
+            status.setTextColor(Color.rgb(81, 255, 191));
         } catch (Exception e) {
-            status.setText("Não consegui abrir esse arquivo.");
+            String message = e.getMessage();
+            status.setText(message == null ? "Arquivo inválido ou ainda não compatível." : message);
+            status.setTextColor(Color.rgb(255, 103, 144));
         }
     }
 }

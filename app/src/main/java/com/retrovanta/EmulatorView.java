@@ -13,12 +13,14 @@ final class EmulatorView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final GameBoyCore core = new GameBoyCore();
     private Bitmap frameBitmap;
-    private boolean loaded;
+    private boolean loaded, stickActive;
     private int held;
+    private float stickDx, stickDy;
 
     EmulatorView(Context context) {
         super(context);
         setFocusable(true);
+        setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         postInvalidateOnAnimation();
     }
 
@@ -28,62 +30,117 @@ final class EmulatorView extends View {
         postInvalidateOnAnimation();
     }
 
+    String getRomTitle() { return core.getCartridgeTitle(); }
+
     @Override protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         int w=getWidth(), h=getHeight();
-        canvas.drawColor(Color.rgb(18, 24, 34));
+        canvas.drawColor(Color.rgb(5, 10, 32));
+        paint.setColor(0x182b67ff);
+        canvas.drawCircle(w*0.50f,h*0.33f,Math.min(w,h)*0.48f,paint);
         if (loaded) {
             int[] pixels=core.frame();
             if(frameBitmap==null) frameBitmap=Bitmap.createBitmap(GameBoyCore.WIDTH,GameBoyCore.HEIGHT,Bitmap.Config.ARGB_8888);
             frameBitmap.setPixels(pixels,0,GameBoyCore.WIDTH,0,0,GameBoyCore.WIDTH,GameBoyCore.HEIGHT);
-            float maxW=w*0.66f, maxH=h*0.51f, scale=Math.min(maxW/GameBoyCore.WIDTH,maxH/GameBoyCore.HEIGHT);
+            float maxW=w*0.66f, maxH=h*0.49f, scale=Math.min(maxW/GameBoyCore.WIDTH,maxH/GameBoyCore.HEIGHT);
             float dw=GameBoyCore.WIDTH*scale, dh=GameBoyCore.HEIGHT*scale;
-            float left=(w-dw)/2f, top=h*0.04f;
-            paint.setColor(Color.rgb(125,255,200));
-            canvas.drawRoundRect(new RectF(left-7,top-7,left+dw+7,top+dh+7),10,10,paint);
+            float left=(w-dw)/2f, top=h*0.025f;
+            paint.setColor(Color.rgb(33, 225, 255)); paint.setShadowLayer(16,0,0,0xff1adfff);
+            canvas.drawRoundRect(new RectF(left-7,top-7,left+dw+7,top+dh+7),12,12,paint);
+            paint.clearShadowLayer();
+            paint.setColor(Color.WHITE);
             canvas.drawBitmap(frameBitmap,null,new RectF(left,top,left+dw,top+dh),paint);
         } else {
-            paint.setColor(Color.rgb(125,255,200)); paint.setTextSize(22);
-            canvas.drawText("RETRO VANTA",w*0.36f,h*0.33f,paint);
-            paint.setColor(Color.LTGRAY); paint.setTextSize(15);
-            canvas.drawText("Núcleo DMG próprio · escolha uma ROM para iniciar",w*0.20f,h*0.42f,paint);
+            paint.setColor(Color.rgb(48, 226, 255)); paint.setShadowLayer(12,0,0,0xff1adfff); paint.setTextSize(23);
+            canvas.drawText("RETRO VANTA",w*0.39f,h*0.23f,paint); paint.clearShadowLayer();
+            paint.setColor(Color.rgb(190, 210, 242)); paint.setTextSize(14);
+            canvas.drawText("NÚCLEO DMG ORIGINAL · SELECIONE UMA ROM",w*0.24f,h*0.33f,paint);
         }
-        drawControls(canvas,w,h);
+        drawController(canvas,w,h);
         postInvalidateOnAnimation();
     }
 
-    private void drawControls(Canvas canvas,int w,int h) {
-        float cy=h*0.82f, r=Math.min(h*0.085f,w*0.035f);
-        paint.setColor(0x5529d5a0);
-        canvas.drawRoundRect(new RectF(w*0.06f,cy-r*2.25f,w*0.06f+r*2.7f,cy+r*2.25f),r,r,paint);
-        paint.setColor(0xff7dffc8);
-        canvas.drawCircle(w*0.06f+r*0.5f,cy,r*0.62f,paint);
-        canvas.drawCircle(w*0.06f+r*2.05f,cy,r*0.62f,paint);
-        canvas.drawCircle(w*0.06f+r*1.28f,cy-r*1.35f,r*0.62f,paint);
-        canvas.drawCircle(w*0.06f+r*1.28f,cy+r*1.35f,r*0.62f,paint);
-        float ax=w*0.86f, bx=w*0.94f;
-        paint.setColor(0x778751d0); canvas.drawCircle(ax,cy,r*0.9f,paint); canvas.drawCircle(bx,cy-r*0.25f,r*0.9f,paint);
-        paint.setColor(Color.WHITE); paint.setTextSize(12);
-        canvas.drawText("B",ax-4,cy+4,paint); canvas.drawText("A",bx-4,cy-r*0.25f+4,paint);
-        paint.setColor(0xffd8e2ec); paint.setTextSize(11);
-        canvas.drawText("SELECT",w*0.46f,cy+5,paint); canvas.drawText("START",w*0.54f,cy+5,paint);
+    private float stickRadius(int w,int h) { return Math.min(w*0.072f,h*0.155f); }
+    private float stickCenterX(int w) { return w*0.19f; }
+    private float controlCenterY(int h) { return h*0.80f; }
+    private float buttonRadius(int w,int h) { return Math.min(w*0.040f,h*0.105f); }
+    private float buttonAX(int w) { return w*0.91f; }
+    private float buttonBX(int w) { return w*0.80f; }
+
+    private void drawController(Canvas canvas,int w,int h) {
+        float cy=controlCenterY(h), sr=stickRadius(w,h), br=buttonRadius(w,h), sx=stickCenterX(w);
+        paint.setColor(0x2424dfff); canvas.drawCircle(sx,cy,sr*1.45f,paint);
+        paint.setColor(0xff103059); paint.setStyle(Paint.Style.FILL);
+        paint.setShadowLayer(12,0,0,0xff27dcff); canvas.drawCircle(sx,cy,sr,paint); paint.clearShadowLayer();
+        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(Math.max(2,sr*0.07f)); paint.setColor(0xff50ddff);
+        canvas.drawCircle(sx,cy,sr*0.96f,paint); paint.setStyle(Paint.Style.FILL);
+        for(int i=0;i<4;i++) {
+            double a=Math.PI*0.5*i;
+            paint.setColor(0xffb5f6ff);
+            canvas.drawCircle(sx+(float)Math.cos(a)*sr*0.69f,cy+(float)Math.sin(a)*sr*0.69f,sr*0.065f,paint);
+        }
+        float knobX=sx+stickDx, knobY=cy+stickDy;
+        paint.setColor(0xfff5ffff); paint.setShadowLayer(12,0,0,0xffffffff); canvas.drawCircle(knobX,knobY,sr*0.40f,paint); paint.clearShadowLayer();
+        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(Math.max(2,sr*0.08f)); paint.setColor(0xff62e9ff); canvas.drawCircle(knobX,knobY,sr*0.40f,paint); paint.setStyle(Paint.Style.FILL);
+
+        drawActionButton(canvas,buttonBX(w),cy,br,0xff42ffb1,"B");
+        drawActionButton(canvas,buttonAX(w),cy,br,0xffff4fba,"A");
+        drawPill(canvas,w*0.455f,cy+br*1.32f,br*0.72f,br*0.26f,"SELECT");
+        drawPill(canvas,w*0.565f,cy+br*1.32f,br*0.72f,br*0.26f,"START");
+    }
+
+    private void drawActionButton(Canvas canvas,float x,float y,float r,int color,String label) {
+        paint.setColor(color & 0x33ffffff); canvas.drawCircle(x,y,r*1.40f,paint);
+        paint.setColor(color); paint.setShadowLayer(14,0,0,color); canvas.drawCircle(x,y,r,paint); paint.clearShadowLayer();
+        paint.setColor(0xff07132d); canvas.drawCircle(x,y,r*0.76f,paint);
+        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(Math.max(2,r*0.09f)); paint.setColor(color); canvas.drawCircle(x,y,r*0.76f,paint); paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE); paint.setTextSize(r*0.72f); paint.setFakeBoldText(true);
+        canvas.drawText(label,x-paint.measureText(label)/2f,y+r*0.24f,paint); paint.setFakeBoldText(false);
+    }
+
+    private void drawPill(Canvas canvas,float x,float y,float halfWidth,float halfHeight,String label) {
+        paint.setColor(0xff102b54); paint.setShadowLayer(7,0,0,0xff357dff);
+        canvas.drawRoundRect(new RectF(x-halfWidth,y-halfHeight,x+halfWidth,y+halfHeight),halfHeight,halfHeight,paint); paint.clearShadowLayer();
+        paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(2); paint.setColor(0xff74aaff);
+        canvas.drawRoundRect(new RectF(x-halfWidth,y-halfHeight,x+halfWidth,y+halfHeight),halfHeight,halfHeight,paint); paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE); paint.setTextSize(Math.max(9,halfHeight*0.9f)); paint.setFakeBoldText(true);
+        canvas.drawText(label,x-paint.measureText(label)/2f,y+halfHeight*0.35f,paint); paint.setFakeBoldText(false);
     }
 
     @Override public boolean onTouchEvent(MotionEvent event) {
-        if(event.getAction()!=MotionEvent.ACTION_DOWN && event.getAction()!=MotionEvent.ACTION_MOVE && event.getAction()!=MotionEvent.ACTION_UP && event.getAction()!=MotionEvent.ACTION_CANCEL) return true;
-        if(event.getAction()==MotionEvent.ACTION_UP || event.getAction()==MotionEvent.ACTION_CANCEL) { held=0; core.setButtons(0); invalidate(); return true; }
-        float x=event.getX(), y=event.getY(), w=getWidth(), h=getHeight(), cy=h*0.82f;
-        int bits=0;
-        if(y>h*0.62f && x<w*0.32f) {
-            float cx=w*0.06f+Math.min(h*0.085f,w*0.035f)*1.28f;
-            float r=Math.min(h*0.085f,w*0.035f)*1.4f;
-            if(Math.abs(x-cx)>Math.abs(y-cy)) bits=x>cx?1:2;
-            else bits=y<cy?4:8;
-        } else if(y>h*0.62f && x>w*0.78f) {
-            bits=x>w*0.90f?16:32;
-        } else if(y>h*0.62f) {
-            bits=x<w*0.50f?64:128;
+        int action=event.getActionMasked();
+        if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL) {
+            held=0; stickActive=false; stickDx=0; stickDy=0; core.setButtons(0); invalidate(); return true;
         }
+        if(action!=MotionEvent.ACTION_DOWN && action!=MotionEvent.ACTION_POINTER_DOWN && action!=MotionEvent.ACTION_MOVE && action!=MotionEvent.ACTION_POINTER_UP) return true;
+        int w=getWidth(),h=getHeight(),count=event.getPointerCount(),bits=0;
+        int lifted=action==MotionEvent.ACTION_POINTER_UP?event.getActionIndex():-1;
+        boolean activeStick=false;
+        float newDx=0,newDy=0,sx=stickCenterX(w),cy=controlCenterY(h),sr=stickRadius(w,h),br=buttonRadius(w,h);
+        for(int i=0;i<count;i++) {
+            if(i==lifted) continue;
+            float x=event.getX(i), y=event.getY(i);
+            float dx=x-sx,dy=y-cy;
+            if(y>h*0.59f && x<w*0.38f && dx*dx+dy*dy<(sr*1.55f)*(sr*1.55f)) {
+                activeStick=true;
+                float length=(float)Math.sqrt(dx*dx+dy*dy), limit=sr*0.78f;
+                if(length>limit && length>0) { dx=dx*limit/length; dy=dy*limit/length; }
+                newDx=dx;newDy=dy;
+                if(Math.abs(dx)>sr*0.23f) bits|=dx>0?1:2;
+                if(Math.abs(dy)>sr*0.23f) bits|=dy>0?8:4;
+                continue;
+            }
+            if(y>h*0.61f && near(x,y,buttonAX(w),cy,br*1.35f)) bits|=16;
+            else if(y>h*0.61f && near(x,y,buttonBX(w),cy,br*1.35f)) bits|=32;
+            else if(y>h*0.61f && near(x,y,w*0.455f,cy+br*1.32f,br*0.9f)) bits|=64;
+            else if(y>h*0.61f && near(x,y,w*0.565f,cy+br*1.32f,br*0.9f)) bits|=128;
+        }
+        stickActive=activeStick;
+        if(activeStick) { stickDx=newDx;stickDy=newDy; } else { stickDx=0;stickDy=0; }
         held=bits; core.setButtons(held); invalidate(); return true;
+    }
+
+    private boolean near(float x,float y,float cx,float cy,float radius) {
+        float dx=x-cx,dy=y-cy; return dx*dx+dy*dy<=radius*radius;
     }
 }
