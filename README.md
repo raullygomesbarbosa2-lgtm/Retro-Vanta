@@ -1,28 +1,28 @@
-# RetroRaiz
+# Retro Vanta
 
-Aplicativo Android de emulação retrô derivado do projeto aberto [Lemuroid](https://github.com/Swordfish90/Lemuroid), com cores Libretro e interface para organizar e jogar arquivos de jogos do próprio usuário.
+Emulador retrô para Android, com foco em consoles antigos e arcades. O projeto usa como base o código aberto do Lemuroid/Libretro, com identidade Retro Vanta e uma lista reduzida de sistemas.
 
-## Sistemas incluídos
+## Sistemas previstos
 
 - Atari 2600, Atari 7800 e Atari Lynx
-- NES e Super Nintendo
+- NES e Super Nintendo (SNES)
 - Game Boy, Game Boy Color e Game Boy Advance
 - Master System, Game Gear, Mega Drive/Genesis e Sega CD
 - PC Engine
 - Neo Geo Pocket e Neo Geo Pocket Color
 - WonderSwan e WonderSwan Color
-- Arcade por FBNeo e MAME 2003 Plus (o suporte a jogos Neo Geo depende do formato e do conjunto de arquivos aceito pelo core)
+- Arcade via FinalBurn Neo e MAME 2003 Plus; compatibilidade varia por jogo e conjunto de arquivos
 
-PlayStation 1, PSP, Nintendo 64, Nintendo DS/3DS e DOS ficam fora da versão RetroRaiz.
+**Fora do app:** PlayStation 1 (PS1), PSP, Nintendo 64, DS/3DS e sistemas mais novos.
 
-## ROMs
+## Jogos e BIOS
 
-O aplicativo não inclui ROMs, BIOS ou jogos. O usuário seleciona os próprios arquivos. ROMs comuns e ROM hacks podem funcionar quando usam um formato aceito pelo core correspondente; a compatibilidade de cada hack depende do jogo-base e da alteração feita.
+O APK não inclui ROMs, BIOS ou jogos. Adicione somente arquivos que você tenha direito de usar. Hacks de ROM podem funcionar se forem compatíveis com o core e com o jogo-base.
 
 ## APK
 
-O fluxo do GitHub Actions compila um APK Android de teste e publica builds em Releases. A compilação usa o código do Lemuroid fixado no commit `93e321d08f3dc0776bb0545da975d2cd7cd1f78f` e o submódulo público de cores. O APK inicial é assinado com a chave de depuração do Android, apropriado para instalação manual e teste; não é uma versão da Play Store.
+O GitHub Actions compila o APK de teste quando o projeto é enviado à branch `main` e publica o arquivo em Releases. A primeira compilação pode demorar alguns minutos. O APK de depuração serve para instalação manual e pode exigir aceitar a instalação de apps desta origem.
 
-## Licença e créditos
+## Créditos e licença
 
-RetroRaiz é uma adaptação do Lemuroid e mantém a licença GNU GPL v3 e os avisos de copyright aplicáveis. Consulte `COPYING`, o repositório upstream e as licenças dos cores de terceiros. RetroRaiz não é afiliado à Nintendo, Sony, Sega ou SNK.
+O Retro Vanta é uma adaptação baseada no Lemuroid e em cores Libretro de terceiros. Mantém os avisos e obrigações de licenciamento correspondentes (GPLv3 e licenças dos cores); consulte `COPYING` e os repositórios upstream. Projeto independente, sem afiliação com Nintendo, Sony, Sega ou SNK.
