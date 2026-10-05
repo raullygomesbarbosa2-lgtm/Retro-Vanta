@@ -1,28 +1,21 @@
-# Retro Vanta
+# Retro Vanta — implementação original
 
-Emulador retrô para Android, com foco em consoles antigos e arcades. O projeto usa como base o código aberto do Lemuroid/Libretro, com identidade Retro Vanta e uma lista reduzida de sistemas.
+Este repositório inicia uma implementação Android independente, sem usar Lemuroid, RetroArch ou Libretro como base. A primeira compilação é um protótipo experimental para Game Boy original (DMG), escrito para este projeto. Ainda não representa o emulador multissistema completo: novos consoles serão implementados e testados por etapas.
 
-## Sistemas previstos
+## Estado desta versão
 
-- Atari 2600, Atari 7800 e Atari Lynx
-- NES e Super Nintendo (SNES)
-- Game Boy, Game Boy Color e Game Boy Advance
-- Master System, Game Gear, Mega Drive/Genesis e Sega CD
-- PC Engine
-- Neo Geo Pocket e Neo Geo Pocket Color
-- WonderSwan e WonderSwan Color
-- Arcade via FinalBurn Neo e MAME 2003 Plus; compatibilidade varia por jogo e conjunto de arquivos
+- App Android próprio com seletor de ROM local.
+- Núcleo DMG inicial escrito em Java, com CPU LR35902, memória/cartridge ROM e desenho básico do plano de fundo por tiles.
+- Suporte inicial a cartuchos ROM-only e MBC1; compatibilidade ainda limitada e não validada com todo o catálogo. Game Boy Color ainda não é emulado.
+- Controles virtuais simples; áudio, salvamento, Game Boy Color, sprites avançados, SNES e arcade/SNK ainda não implementados.
+- PS1 e PSP ficam fora do escopo.
 
-**Fora do app:** PlayStation 1 (PS1), PSP, Nintendo 64, DS/3DS e sistemas mais novos.
+O projeto não distribui ROMs, BIOS nem jogos. Use apenas arquivos que você tenha direito de usar.
 
-## Jogos e BIOS
+## Build
 
-O APK não inclui ROMs, BIOS ou jogos. Adicione somente arquivos que você tenha direito de usar. Hacks de ROM podem funcionar se forem compatíveis com o core e com o jogo-base.
+O GitHub Actions compila um APK Android de depuração e o publica como release de teste. Como é um protótipo, alguns jogos podem não iniciar ou apresentar gráficos/controles incompletos.
 
-## APK
+## Licença
 
-O GitHub Actions compila o APK de teste quando o projeto é enviado à branch `main` e publica o arquivo em Releases. A primeira compilação pode demorar alguns minutos. O APK de depuração serve para instalação manual e pode exigir aceitar a instalação de apps desta origem.
-
-## Créditos e licença
-
-O Retro Vanta é uma adaptação baseada no Lemuroid e em cores Libretro de terceiros. Mantém os avisos e obrigações de licenciamento correspondentes (GPLv3 e licenças dos cores); consulte `COPYING` e os repositórios upstream. Projeto independente, sem afiliação com Nintendo, Sony, Sega ou SNK.
+O código original deste protótipo está sob MIT. Consulte `LICENSE`.
