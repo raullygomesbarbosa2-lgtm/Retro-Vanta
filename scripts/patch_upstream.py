@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Patch the pinned Lemuroid source into the RetroRaiz build."""
+"""Patch the pinned Lemuroid source into the Retro Vanta build."""
 from pathlib import Path
 import sys
 
@@ -17,20 +17,20 @@ def replace_once(path: Path, old: str, new: str) -> None:
 app_build = ROOT / "lemuroid-app/build.gradle.kts"
 replace_once(app_build, 'versionCode = 252', 'versionCode = 1')
 replace_once(app_build, 'versionName = "1.17.0"', 'versionName = "1.0.0"')
-replace_once(app_build, 'applicationId = "com.swordfish.lemuroid"', 'applicationId = "com.raullygomesbarbosa2.retroraiz"')
-replace_once(app_build, 'resValue("string", "lemuroid_name", "Lemuroid")', 'resValue("string", "lemuroid_name", "RetroRaiz")')
-replace_once(app_build, 'resValue("string", "lemuroid_name", "LemuroiDebug")', 'resValue("string", "lemuroid_name", "RetroRaiz")')
+replace_once(app_build, 'applicationId = "com.swordfish.lemuroid"', 'applicationId = "com.raullygomesbarbosa2.retrovanta"')
+replace_once(app_build, 'resValue("string", "lemuroid_name", "Lemuroid")', 'resValue("string", "lemuroid_name", "Retro Vanta")')
+replace_once(app_build, 'resValue("string", "lemuroid_name", "LemuroiDebug")', 'resValue("string", "lemuroid_name", "Retro Vanta")')
 
 # Replace the displayed product name in the app's translated text.
 for strings in (ROOT / "lemuroid-app/src/main/res").glob("values*/strings.xml"):
     original = strings.read_text(encoding="utf-8")
-    updated = original.replace("Lemuroid", "RetroRaiz")
+    updated = original.replace("Lemuroid", "Retro Vanta")
     if updated != original:
         strings.write_text(updated, encoding="utf-8")
 
 manifest = ROOT / "lemuroid-app/src/main/AndroidManifest.xml"
 manifest_text = manifest.read_text(encoding="utf-8")
-manifest.write_text(manifest_text.replace('android:scheme="lemuroid"', 'android:scheme="retroraiz"'), encoding="utf-8")
+manifest.write_text(manifest_text.replace('android:scheme="lemuroid"', 'android:scheme="retrovanta"'), encoding="utf-8")
 
 systems = ROOT / "retrograde-app-shared/src/main/java/com/swordfish/lemuroid/lib/library/GameSystem.kt"
 marker = "            )\n\n        private val byIdCache"
@@ -70,4 +70,4 @@ if core_libs.exists():
         if any(marker in library.name.lower() for marker in excluded_markers):
             library.unlink()
             removed += 1
-print(f"RetroRaiz source configured; removed {removed} unsupported core binaries.")
+print(f"Retro Vanta source configured; removed {removed} unsupported core binaries.")
