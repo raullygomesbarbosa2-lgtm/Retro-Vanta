@@ -49,7 +49,7 @@ final class GameBoyCore {
                     int off=(byte)fetch(); if (condition(y-4)) { pc=(pc+off)&65535; return 12; } return 8;
                 case 1:
                     if (q==0) { setPair(p, fetch16()); return 12; }
-                    setHL(addHL(hl(), pair(p))); return 8;
+                    setHL(addHL(pair(p))); return 8;
                 case 2: {
                     int addr = p==0 ? pair(0) : p==1 ? pair(1) : hl();
                     if (q==0) write(addr,a); else a=read(addr);
