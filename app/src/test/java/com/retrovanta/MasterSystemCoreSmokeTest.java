@@ -22,7 +22,7 @@ public final class MasterSystemCoreSmokeTest {
         assertEquals(256,core.videoWidth()); assertEquals(192,core.videoHeight());
         int[] pixels=core.frame();
         assertEquals(256*192,pixels.length);
-        assertEquals(0xff00ff00,pixels[0]);
+        assertEquals(String.format("pixel0=%08x pixel256=%08x",pixels[0],pixels[256]),0xff00ff00,pixels[0]);
         assertEquals(0xffff0000,pixels[256]);
         core.setButtons(MasterSystemCore.BUTTON_A|MasterSystemCore.BUTTON_RIGHT);
     }
