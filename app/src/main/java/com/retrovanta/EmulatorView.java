@@ -11,9 +11,10 @@ import android.view.View;
 
 final class EmulatorView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
-    private final GameBoyCore core = new GameBoyCore();
+    private EmulatorCore core = new GameBoyCore();
     private Bitmap frameBitmap;
     private boolean loaded, stickActive;
+    private String placeholder = "NÚCLEO GAME BOY · SELECIONE UMA ROM";
     private int held;
     private float stickDx, stickDy;
 
@@ -21,6 +22,19 @@ final class EmulatorView extends View {
         super(context);
         setFocusable(true);
         setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        postInvalidateOnAnimation();
+    }
+
+    void setSystem(int systemId) {
+        core=systemId==1?new NesCore():new GameBoyCore();
+        loaded=false; frameBitmap=null; held=0; stickActive=false; stickDx=stickDy=0;
+        placeholder=systemId==1?"NÚCLEO NES · SELECIONE UMA ROM":"NÚCLEO GAME BOY · SELECIONE UMA ROM";
+        postInvalidateOnAnimation();
+    }
+
+    void clearForUnavailableSystem() {
+        loaded=false; frameBitmap=null; held=0; stickActive=false; stickDx=stickDy=0;
+        placeholder="ESTE NÚCLEO AINDA NÃO ESTÁ INTEGRADO";
         postInvalidateOnAnimation();
     }
 
@@ -40,10 +54,11 @@ final class EmulatorView extends View {
         canvas.drawCircle(w*0.50f,h*0.33f,Math.min(w,h)*0.48f,paint);
         if (loaded) {
             int[] pixels=core.frame();
-            if(frameBitmap==null) frameBitmap=Bitmap.createBitmap(GameBoyCore.WIDTH,GameBoyCore.HEIGHT,Bitmap.Config.ARGB_8888);
-            frameBitmap.setPixels(pixels,0,GameBoyCore.WIDTH,0,0,GameBoyCore.WIDTH,GameBoyCore.HEIGHT);
-            float maxW=w*0.66f, maxH=h*0.49f, scale=Math.min(maxW/GameBoyCore.WIDTH,maxH/GameBoyCore.HEIGHT);
-            float dw=GameBoyCore.WIDTH*scale, dh=GameBoyCore.HEIGHT*scale;
+            int gameWidth=core.videoWidth(), gameHeight=core.videoHeight();
+            if(frameBitmap==null) frameBitmap=Bitmap.createBitmap(gameWidth,gameHeight,Bitmap.Config.ARGB_8888);
+            frameBitmap.setPixels(pixels,0,gameWidth,0,0,gameWidth,gameHeight);
+            float maxW=w*0.66f, maxH=h*0.49f, scale=Math.min(maxW/gameWidth,maxH/gameHeight);
+            float dw=gameWidth*scale, dh=gameHeight*scale;
             float left=(w-dw)/2f, top=h*0.025f;
             paint.setColor(Color.rgb(33, 225, 255)); paint.setShadowLayer(16,0,0,0xff1adfff);
             canvas.drawRoundRect(new RectF(left-7,top-7,left+dw+7,top+dh+7),12,12,paint);
@@ -54,7 +69,7 @@ final class EmulatorView extends View {
             paint.setColor(Color.rgb(48, 226, 255)); paint.setShadowLayer(12,0,0,0xff1adfff); paint.setTextSize(23);
             canvas.drawText("RETRO VANTA",w*0.39f,h*0.23f,paint); paint.clearShadowLayer();
             paint.setColor(Color.rgb(190, 210, 242)); paint.setTextSize(14);
-            canvas.drawText("NÚCLEO DMG ORIGINAL · SELECIONE UMA ROM",w*0.24f,h*0.33f,paint);
+            canvas.drawText(placeholder,w*0.24f,h*0.33f,paint);
         }
         drawController(canvas,w,h);
         postInvalidateOnAnimation();
@@ -110,7 +125,7 @@ final class EmulatorView extends View {
     @Override public boolean onTouchEvent(MotionEvent event) {
         int action=event.getActionMasked();
         if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL) {
-            held=0; stickActive=false; stickDx=0; stickDy=0; core.setButtons(0); invalidate(); return true;
+            held=0; stickActive=false; stickDx=0; stickDy=0; sendButtons(0); invalidate(); return true;
         }
         if(action!=MotionEvent.ACTION_DOWN && action!=MotionEvent.ACTION_POINTER_DOWN && action!=MotionEvent.ACTION_MOVE && action!=MotionEvent.ACTION_POINTER_UP) return true;
         int w=getWidth(),h=getHeight(),count=event.getPointerCount(),bits=0;
@@ -137,7 +152,22 @@ final class EmulatorView extends View {
         }
         stickActive=activeStick;
         if(activeStick) { stickDx=newDx;stickDy=newDy; } else { stickDx=0;stickDy=0; }
-        held=bits; core.setButtons(held); invalidate(); return true;
+        held=bits; sendButtons(held); invalidate(); return true;
+    }
+
+    private void sendButtons(int bits) {
+        if(core instanceof NesCore) {
+            int n=0;
+            if((bits&16)!=0)n|=NesCore.BUTTON_A;
+            if((bits&32)!=0)n|=NesCore.BUTTON_B;
+            if((bits&64)!=0)n|=NesCore.BUTTON_SELECT;
+            if((bits&128)!=0)n|=NesCore.BUTTON_START;
+            if((bits&4)!=0)n|=NesCore.BUTTON_UP;
+            if((bits&8)!=0)n|=NesCore.BUTTON_DOWN;
+            if((bits&2)!=0)n|=NesCore.BUTTON_LEFT;
+            if((bits&1)!=0)n|=NesCore.BUTTON_RIGHT;
+            core.setButtons(n);
+        } else core.setButtons(bits);
     }
 
     private boolean near(float x,float y,float cx,float cy,float radius) {

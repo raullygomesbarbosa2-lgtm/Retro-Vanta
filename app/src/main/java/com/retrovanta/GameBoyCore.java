@@ -3,7 +3,7 @@ package com.retrovanta;
 import java.util.Arrays;
 
 /** Small, original DMG interpreter prototype for the Retro Vanta project. */
-final class GameBoyCore {
+final class GameBoyCore implements EmulatorCore {
     static final int WIDTH = 160, HEIGHT = 144;
     private static final int[] SHADES = {0xffe5f3d1, 0xffa8c686, 0xff527a54, 0xff243b3b};
     private byte[] rom = new byte[0];
@@ -17,7 +17,7 @@ final class GameBoyCore {
     private boolean ime, halted;
     private String cartridgeTitle = "Game Boy";
 
-    void load(byte[] image) {
+    @Override public void load(byte[] image) {
         if (image == null || image.length < 0x150) throw new IllegalArgumentException("Arquivo pequeno ou inválido para uma ROM de Game Boy.");
         if (image.length > 8 * 1024 * 1024) throw new IllegalArgumentException("A ROM passa do limite inicial de 8 MB.");
         int cartridge = image[0x147] & 255;
@@ -41,7 +41,9 @@ final class GameBoyCore {
         io[0x48]=(byte)0xff; io[0x49]=(byte)0xff; io[0x0f]=(byte)0xe1;
     }
 
-    String getCartridgeTitle() { return cartridgeTitle; }
+    @Override public String getCartridgeTitle() { return cartridgeTitle; }
+    @Override public int videoWidth() { return WIDTH; }
+    @Override public int videoHeight() { return HEIGHT; }
 
     private String readTitle(byte[] image) {
         StringBuilder title = new StringBuilder();
@@ -54,13 +56,13 @@ final class GameBoyCore {
         return value.isEmpty() ? "Game Boy (sem título no cabeçalho)" : value;
     }
 
-    void setButtons(int bits) {
+    @Override public void setButtons(int bits) {
         int next=bits&0xff;
         if ((next & ~pressed)!=0) io[0x0f]=(byte)((io[0x0f]&255)|0x10);
         pressed=next;
     }
 
-    int[] frame() {
+    @Override public int[] frame() {
         int spent = 0, guard = 0;
         while (spent < 70224 && guard++ < 50000) {
             int used=step(); spent+=used; tickHardware(used);

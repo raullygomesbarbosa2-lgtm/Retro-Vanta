@@ -28,19 +28,21 @@ public final class MainActivity extends Activity {
     private static final int MAX_SOURCE_BYTES = 16 * 1024 * 1024;
     private EmulatorView emulatorView;
     private TextView status;
+    private int selectedSystem;
     private Button open;
 
     private static final String[] SYSTEMS = {
-        "Game Boy (DMG) — DISPONÍVEL",
-        "Game Boy Color — em desenvolvimento",
-        "Game Boy Advance — em desenvolvimento",
-        "Super Nintendo / SNES — em desenvolvimento",
-        "Mega Drive / Genesis — em desenvolvimento",
-        "Master System / Mega System — em desenvolvimento",
-        "Atari 2600 / 7800 / Lynx — em desenvolvimento",
-        "PC Engine — em desenvolvimento",
-        "Neo Geo Pocket / Color — em desenvolvimento",
-        "Arcade FBNeo / MAME — em desenvolvimento"
+        "Game Boy original (DMG)",
+        "Nintendo Entertainment System (NES)",
+        "Game Boy Color (GBC) — indisponível",
+        "Game Boy Advance (GBA) — indisponível",
+        "Super Nintendo (SNES) — indisponível",
+        "Mega Drive / Genesis — indisponível",
+        "Master System / Mega System — indisponível",
+        "Atari 2600 / 7800 / Lynx — indisponível",
+        "PC Engine — indisponível",
+        "Neo Geo Pocket / Color — indisponível",
+        "Arcade FBNeo / MAME — indisponível"
     };
 
     @Override public void onCreate(Bundle state) {
@@ -90,10 +92,18 @@ public final class MainActivity extends Activity {
         systemMenu.setSelection(0);
         systemMenu.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                boolean supported=position==0;
+                selectedSystem=position;
+                boolean supported=position==0||position==1;
                 open.setEnabled(supported); open.setAlpha(supported?1f:0.45f);
-                if(!supported) { status.setText("Este núcleo ainda não foi implementado; o único ativo é Game Boy DMG."); status.setTextColor(Color.rgb(255,190,95)); }
-                else { status.setText("Game Boy original · aceita .gb e ZIP com ROM .gb"); status.setTextColor(Color.rgb(179,204,240)); }
+                if(supported) {
+                    emulatorView.setSystem(position);
+                    status.setText(position==0?"Game Boy · .gb/.gbc ou ZIP compatível":"NES · iNES 1.0, mappers 0/2 ou ZIP .nes");
+                    status.setTextColor(Color.rgb(179,204,240));
+                } else {
+                    emulatorView.clearForUnavailableSystem();
+                    status.setText("Este sistema ainda não tem núcleo integrado.");
+                    status.setTextColor(Color.rgb(255,190,95));
+                }
             }
             @Override public void onNothingSelected(AdapterView<?> parent) { }
         });
@@ -137,13 +147,14 @@ public final class MainActivity extends Activity {
             ZipEntry entry;
             while((entry=zip.getNextEntry())!=null) {
                 String name=entry.getName().toLowerCase(Locale.ROOT);
-                if(entry.isDirectory()||(!name.endsWith(".gb")&&!name.endsWith(".gbc")))continue;
+                boolean supportedName=selectedSystem==1?name.endsWith(".nes"):(name.endsWith(".gb")||name.endsWith(".gbc"));
+                if(entry.isDirectory()||!supportedName)continue;
                 try { loadOneRom(readLimited(zip,MAX_ROM_BYTES)); return; }
                 catch(IllegalArgumentException ex) { lastError=ex.getMessage(); }
             }
         }
         if(lastError!=null)throw new IOException(lastError);
-        throw new IOException("O ZIP não contém uma ROM .gb ou .gbc.");
+        throw new IOException(selectedSystem==1?"O ZIP não contém uma ROM .nes.":"O ZIP não contém uma ROM .gb ou .gbc.");
     }
 
     private void loadOneRom(byte[] rom) {
