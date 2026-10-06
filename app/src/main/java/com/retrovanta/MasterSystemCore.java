@@ -34,7 +34,7 @@ final class MasterSystemCore implements EmulatorCore {
         if(image.length>8*1024*1024+512) throw new IllegalArgumentException("A ROM excede o limite inicial de 8 MB.");
         int offset=(image.length%0x4000==512)?512:0;
         rom=Arrays.copyOfRange(image,offset,image.length);
-        Arrays.fill(ram,(byte)0); Arrays.fill(vram,(byte)0); Arrays.fill(cram,(byte)0); Arrays.fill(regs,(byte)0); Arrays.fill(oam,(byte)0);
+        Arrays.fill(ram,(byte)0); Arrays.fill(vram,(byte)0); Arrays.fill(cram,(byte)0); Arrays.fill(regs,(byte)0); Arrays.fill(oam,(byte)208);
         banks[0]=0;banks[1]=1;banks[2]=2;mapperControl=0;vdpAddress=vdpCode=vdpLatch=vdpFirst=vdpStatus=lineCounter=frameNumber=0;
         // SMS reset starts at address zero. Register defaults keep the display off until programmed.
         a=f=b=c=d=e=h=l=0; sp=0xdff0; pc=0; iff1=halted=cycles=buttons=0;
@@ -91,7 +91,32 @@ final class MasterSystemCore implements EmulatorCore {
         putReg(z,x==2?v&~(1<<y):v|(1<<y));return z==6?15:8;
     }
     private void misc(int n){switch(n){case 0:{int old=a;a=(a+1)&255;f=(f&1)|(a==0?0x40:0)|(a&0x80)|(((old&15)==15)?0x10:0)|((old==0x7f)?4:0);break;}case 1:{int old=a;a=(a-1)&255;f=(f&1)|2|(a==0?0x40:0)|(a&0x80)|((old&15)==0?0x10:0)|(old==0x80?4:0);break;}case 2:{int c=a>>>7;a=((a<<1)|c)&255;f=(f&0xc4)|c;break;}case 3:{int c=a&1;a=(a>>>1)|(c<<7);f=(f&0xc4)|c;break;}case 4:{int c=f&1,top=a>>>7;a=((a<<1)|c)&255;f=(f&0xc4)|top;break;}case 5:{int c=f&1,low=a&1;a=(a>>>1)|(c<<7);f=(f&0xc4)|low;break;}case 6:f=(f&0xc4)|0x10;break;case 7:f=(f&0xc4)|(f&1);break;}}
-    private void alu(int op,int v){v&=255;int r,carry=f&1;switch(op){case 0:case 1:r=a+v+carry;f=flags8(r&255)|((r>255)?1:0)|(((~(a^v)&(a^r)&0x80)!=0)?4:0);a=r&255;break;case 2:r=a-v-carry;f=flags8(r&255)|2|((r<0)?1:0)|((((a^v)&(a^r)&0x80)!=0)?4:0);a=r&255;break;case 3:a&=v;f=flags8(a)|0x10;break;case 4:a^=v;f=flags8(a);break;case 5:a|=v;f=flags8(a);break;case 6:r=a-v;f=flags8(r&255)|2|(a>=v?1:0)|((((a^v)&(a^r)&0x80)!=0)?4:0);break;case 7:r=a+v;f=flags8(r&255)|(r>255?1:0)|(((~(a^v)&(a^r)&0x80)!=0)?4:0);a=r&255;break;}}
+    private void alu(int op,int v){
+        v&=255; int old=a, carryIn=f&1, r, out;
+        switch(op){
+            case 0: case 1: {
+                int cin=op==1?carryIn:0; r=old+v+cin; out=r&255;
+                int half=((old&15)+(v&15)+cin)>15?0x10:0;
+                int overflow=((~(old^v)&(old^out)&0x80)!=0)?0x04:0;
+                f=flags8(out)|half|overflow|(r>255?1:0); a=out; break;
+            }
+            case 2: case 3: {
+                int bin=op==3?carryIn:0; r=old-v-bin; out=r&255;
+                int half=((old&15)<((v&15)+bin))?0x10:0;
+                int overflow=(((old^v)&(old^out)&0x80)!=0)?0x04:0;
+                f=flags8(out)|0x02|half|overflow|(r<0?1:0); a=out; break;
+            }
+            case 4: a=old&v; f=flags8(a)|0x10; break;
+            case 5: a=old^v; f=flags8(a); break;
+            case 6: a=old|v; f=flags8(a); break;
+            case 7: {
+                r=old-v; out=r&255;
+                int half=((old&15)<(v&15))?0x10:0;
+                int overflow=(((old^v)&(old^out)&0x80)!=0)?0x04:0;
+                f=flags8(out)|0x02|half|overflow|(old>=v?1:0); break;
+            }
+        }
+    }
     private int flags8(int v){return (v&0xa8)|(v==0?0x40:0)|(((Integer.bitCount(v&255)&1)==0)?4:0);}
     private int inc(int v){int o=(v+1)&255;f=(f&1)|(o&0xa8)|(o==0?0x40:0)|((v&15)==15?0x10:0)|(v==0x7f?4:0);return o;}
     private int dec(int v){int o=(v-1)&255;f=(f&1)|2|(o&0xa8)|(o==0?0x40:0)|((v&15)==0?0x10:0)|(v==0x80?4:0);return o;}
