@@ -1,19 +1,19 @@
 # Retro Vanta — projeto independente
 
-O aplicativo e a interface são próprios; não usam Lemuroid, RetroArch ou Libretro como base. Este branch integra dois núcleos Java do projeto: Game Boy DMG (em progresso) e NES iNES 1.0 com mappers 0/2 (NROM/UxROM). Há também um protótipo SNES isolado, ainda sem integração no app e sem alegação de compatibilidade com jogos comerciais. O restante do catálogo não está implementado e não deve ser anunciado como funcional.
+O app e a interface são próprios; não usam Lemuroid, RetroArch ou Libretro como base. A integração de seleção de ROM e controle na tela atualmente reconhece Game Boy DMG e NES (iNES 1.0, mappers 0/2). Este branch interno também contém núcleos isolados para GBC, Master System e Atari 2600, além de um protótipo SNES. Esses módulos isolados ainda não estão integrados ao menu e não devem ser tratados como suporte pronto.
 
-## Integração atual
+## Módulos escritos para o projeto
 
-- Menu de sistemas: Game Boy original e NES podem receber seleção de ROM; outros consoles são bloqueados até haver um núcleo real.
-- Leitura de arquivos ZIP: procura `.gb`/`.gbc` para Game Boy ou `.nes` para NES; cada núcleo valida o cabeçalho do cartucho.
-- Controles na tela: direcional, A/B, X/Y duplicando A/B no Game Boy, Select e Start; o mapeamento é adaptado ao NES.
-- NES: leitura iNES 1.0, mapper 0 (NROM) e mapper 2 (UxROM), CPU oficial 6502 e renderização de quadro 256×240. Sem áudio/APU; temporização e renderização PPU são aproximadas. NES 2.0 e outros mappers são recusados com aviso.
+- Game Boy DMG: implementação inicial em Java, com carregamento de ZIP `.gb/.gbc`, mas compatibilidade ampla ainda não comprovada.
+- NES: iNES 1.0, NROM/UxROM (mappers 0/2), CPU 6502 e frame de 256×240. Sem APU; temporização/renderização aproximadas.
+- Game Boy Color: CGB separado, com bancos de memória, paletas e composição básica de BG/window/sprites; sem áudio, DMA completo, RTC MBC3, MBC2, velocidade dupla ou compatibilidade comercial comprovada.
+- Master System: cartucho cru pequeno e alguns bancos Sega, Z80/VDP aproximados; faltam instruções/opcodes, timing, áudio e alguns mapeadores.
+- Atari 2600: imagens de cartucho cru de 2 ou 4 KiB, subconjunto do 6507 e renderização TIA aproximada; sem áudio, colisões ou bancos com troca.
+- SNES: protótipo isolado LoROM/Mode 0, poucas instruções 65C816 e fundo BG1 4bpp; sem sprites, áudio/APU, DMA/HDMA, interrupções, SRAM ou coprocessadores.
 
-## Ainda pendente
+## Estado e validação
 
-- O protótipo SNES isolado em `SnesCore.java` aceita somente imagens LoROM padrão em bancos de 32 KiB, sem chips especiais. Implementa um subconjunto de instruções 65C816 em modo emulação, leitura/escrita básica de WRAM e um plano BG1 Mode 0 com tiles 4bpp, mapa 32×32, seleção de paleta, scroll, CGRAM e registrador automático de joypad. Os testes JUnit incluem cartuchos gerados para backdrop, entrada, operações de CPU e upload/renderização/scroll de tiles. Não renderiza sprites e não implementa áudio, DMA/HDMA, interrupções, SRAM ou coprocessadores; a CPU e a PPU são apenas fatias simplificadas e isso não é compatibilidade geral com jogos SNES. Continua fora do menu e do `EmulatorCore`.
-- Os testes SNES foram ampliados, mas ainda precisam ser executados em ambiente com JDK e Gradle/Android configurados; o ambiente de edição atual não tem Java nem Gradle disponíveis.
-- Compatibilidade ampla com todos os jogos e ROM hacks não está garantida; depende do mapper e dos recursos de hardware implementados.
-- Game Boy Color, GBA (além do protótipo SNES isolado), Mega Drive, Master System, Atari, PC Engine, sistemas SNK e arcade ainda precisam de implementação própria.
-- PS1, PSP e consoles modernos ficam fora do escopo.
-- O app não inclui ROMs nem BIOS. Use apenas arquivos que você tenha direito de usar.
+- Há testes JUnit com cartuchos gerados para os módulos. Só os testes executados em CI contam como verificados; protótipos sem teste concluído continuam não validados.
+- Game Boy Color, SNES, Master System e Atari ainda não estão selecionáveis no app. Mega Drive, GBA, outros sistemas Atari, PC Engine, SNK/Neo Geo e arcade continuam sem núcleo implementado.
+- Nenhuma compatibilidade universal com ROM hacks é prometida: formatos, mapeadores e recursos do hardware variam.
+- PS1, PSP e consoles modernos ficam fora do escopo. O app não inclui ROMs nem BIOS; use apenas arquivos que você tenha direito de usar.
