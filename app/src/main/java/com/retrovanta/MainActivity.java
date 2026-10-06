@@ -24,24 +24,23 @@ import java.util.zip.ZipInputStream;
 
 public final class MainActivity extends Activity {
     private static final int OPEN_ROM = 41;
-    private static final int MAX_ROM_BYTES = 8 * 1024 * 1024;
-    private static final int MAX_SOURCE_BYTES = 16 * 1024 * 1024;
+    private static final int MAX_SOURCE_BYTES = 64 * 1024 * 1024;
     private EmulatorView emulatorView;
     private TextView status;
     private int selectedSystem;
     private Button open;
 
     private static final String[] SYSTEMS = {
-        "Game Boy original (DMG)",
-        "Nintendo Entertainment System (NES)",
-        "Game Boy Color (GBC) — indisponível",
-        "Game Boy Advance (GBA) — indisponível",
+        "Game Boy original (DMG) · limitado",
+        "Nintendo Entertainment System (NES) · limitado",
+        "Game Boy Color (GBC) · experimental",
+        "Game Boy Advance (GBA) · experimental",
         "Super Nintendo (SNES) — indisponível",
-        "Mega Drive / Genesis — indisponível",
-        "Master System / Mega System — indisponível",
-        "Atari 2600 / 7800 / Lynx — indisponível",
+        "Mega Drive / Genesis · experimental",
+        "Master System · experimental",
+        "Atari 2600 · experimental",
         "PC Engine — indisponível",
-        "Neo Geo Pocket / Color — indisponível",
+        "Neo Geo Pocket / Color — não compatível ainda",
         "Arcade FBNeo / MAME — indisponível"
     };
 
@@ -93,11 +92,11 @@ public final class MainActivity extends Activity {
         systemMenu.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 selectedSystem=position;
-                boolean supported=position==0||position==1;
+                boolean supported=position==0||position==1||position==2||position==3||position==5||position==6||position==7;
                 open.setEnabled(supported); open.setAlpha(supported?1f:0.45f);
                 if(supported) {
                     emulatorView.setSystem(position);
-                    status.setText(position==0?"Game Boy · .gb/.gbc ou ZIP compatível":"NES · iNES 1.0, mappers 0/2 ou ZIP .nes");
+                    status.setText(systemDescription(position));
                     status.setTextColor(Color.rgb(179,204,240));
                 } else {
                     emulatorView.clearForUnavailableSystem();
@@ -111,6 +110,39 @@ public final class MainActivity extends Activity {
     }
 
     private int dp(float value) { return (int)(value * getResources().getDisplayMetrics().density + 0.5f); }
+
+    private String systemDescription(int system) {
+        switch(system) {
+            case 0: return "DMG · .gb/.zip · suporte limitado";
+            case 1: return "NES · .nes/.zip · iNES mapper 0/2";
+            case 2: return "GBC · .gbc/.zip · experimental";
+            case 3: return "GBA · .gba/.zip · subset experimental";
+            case 5: return "Mega Drive · .bin/.md/.gen/.zip · experimental";
+            case 6: return "Master System · .sms/.zip · experimental";
+            case 7: return "Atari 2600 · .a26/.bin/.zip · raw 2/4 KiB";
+            default: return "Sistema experimental";
+        }
+    }
+
+    private boolean zipNameSupported(String name) {
+        switch(selectedSystem) {
+            case 0: return name.endsWith(".gb");
+            case 1: return name.endsWith(".nes");
+            case 2: return name.endsWith(".gbc");
+            case 3: return name.endsWith(".gba");
+            case 5: return name.endsWith(".bin")||name.endsWith(".md")||name.endsWith(".gen");
+            case 6: return name.endsWith(".sms");
+            case 7: return name.endsWith(".a26")||name.endsWith(".bin");
+            default: return false;
+        }
+    }
+
+    private int romLimitForSystem() {
+        if(selectedSystem==3) return 32*1024*1024;
+        if(selectedSystem==5) return 4*1024*1024;
+        if(selectedSystem==7) return 4096;
+        return 8*1024*1024;
+    }
 
     private void openRom() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -147,18 +179,17 @@ public final class MainActivity extends Activity {
             ZipEntry entry;
             while((entry=zip.getNextEntry())!=null) {
                 String name=entry.getName().toLowerCase(Locale.ROOT);
-                boolean supportedName=selectedSystem==1?name.endsWith(".nes"):(name.endsWith(".gb")||name.endsWith(".gbc"));
-                if(entry.isDirectory()||!supportedName)continue;
-                try { loadOneRom(readLimited(zip,MAX_ROM_BYTES)); return; }
+                if(entry.isDirectory()||!zipNameSupported(name))continue;
+                try { loadOneRom(readLimited(zip,romLimitForSystem())); return; }
                 catch(IllegalArgumentException ex) { lastError=ex.getMessage(); }
             }
         }
         if(lastError!=null)throw new IOException(lastError);
-        throw new IOException(selectedSystem==1?"O ZIP não contém uma ROM .nes.":"O ZIP não contém uma ROM .gb ou .gbc.");
+        throw new IOException("O ZIP não contém uma ROM compatível com o sistema selecionado.");
     }
 
     private void loadOneRom(byte[] rom) {
-        if(rom.length>MAX_ROM_BYTES)throw new IllegalArgumentException("A ROM passa do limite de 8 MB.");
+        if(rom.length>romLimitForSystem())throw new IllegalArgumentException("A ROM excede o limite deste núcleo.");
         emulatorView.loadRom(rom);
         status.setText("Executando: "+emulatorView.getRomTitle()); status.setTextColor(Color.rgb(81,255,191));
     }

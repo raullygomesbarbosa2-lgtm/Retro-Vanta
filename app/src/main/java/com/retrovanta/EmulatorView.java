@@ -26,9 +26,16 @@ final class EmulatorView extends View {
     }
 
     void setSystem(int systemId) {
-        core=systemId==1?new NesCore():new GameBoyCore();
+        switch(systemId) {
+            case 1: core=new NesCore(); placeholder="NÚCLEO NES · SELECIONE UMA ROM"; break;
+            case 2: core=new GameBoyColorCore(); placeholder="NÚCLEO GAME BOY COLOR · SELECIONE UMA ROM"; break;
+            case 3: core=new GbaCore(); placeholder="NÚCLEO GBA EXPERIMENTAL · SELECIONE UMA ROM"; break;
+            case 5: core=new MegaDriveCore(); placeholder="NÚCLEO MEGA DRIVE EXPERIMENTAL · SELECIONE UMA ROM"; break;
+            case 6: core=new MasterSystemCore(); placeholder="NÚCLEO MASTER SYSTEM EXPERIMENTAL · SELECIONE UMA ROM"; break;
+            case 7: core=new Atari2600Core(); placeholder="NÚCLEO ATARI 2600 EXPERIMENTAL · SELECIONE UMA ROM"; break;
+            default: core=new GameBoyCore(); placeholder="NÚCLEO GAME BOY · SELECIONE UMA ROM"; break;
+        }
         loaded=false; frameBitmap=null; held=0; stickActive=false; stickDx=stickDy=0;
-        placeholder=systemId==1?"NÚCLEO NES · SELECIONE UMA ROM":"NÚCLEO GAME BOY · SELECIONE UMA ROM";
         postInvalidateOnAnimation();
     }
 
@@ -167,6 +174,34 @@ final class EmulatorView extends View {
             if((bits&2)!=0)n|=NesCore.BUTTON_LEFT;
             if((bits&1)!=0)n|=NesCore.BUTTON_RIGHT;
             core.setButtons(n);
+        } else if(core instanceof MasterSystemCore) {
+            int sms=0;
+            if((bits&16)!=0)sms|=MasterSystemCore.BUTTON_A;
+            if((bits&32)!=0)sms|=MasterSystemCore.BUTTON_B;
+            if((bits&4)!=0)sms|=MasterSystemCore.BUTTON_UP;
+            if((bits&8)!=0)sms|=MasterSystemCore.BUTTON_DOWN;
+            if((bits&2)!=0)sms|=MasterSystemCore.BUTTON_LEFT;
+            if((bits&1)!=0)sms|=MasterSystemCore.BUTTON_RIGHT;
+            core.setButtons(sms);
+        } else if(core instanceof Atari2600Core) {
+            int atari=0;
+            if((bits&4)!=0)atari|=Atari2600Core.BUTTON_UP;
+            if((bits&8)!=0)atari|=Atari2600Core.BUTTON_DOWN;
+            if((bits&2)!=0)atari|=Atari2600Core.BUTTON_LEFT;
+            if((bits&1)!=0)atari|=Atari2600Core.BUTTON_RIGHT;
+            if((bits&48)!=0)atari|=Atari2600Core.BUTTON_FIRE;
+            core.setButtons(atari);
+        } else if(core instanceof MegaDriveCore) {
+            int md=0;
+            if((bits&16)!=0)md|=MegaDriveCore.BUTTON_A;
+            if((bits&32)!=0)md|=MegaDriveCore.BUTTON_B;
+            if((bits&64)!=0)md|=MegaDriveCore.BUTTON_C;
+            if((bits&128)!=0)md|=MegaDriveCore.BUTTON_START;
+            if((bits&4)!=0)md|=MegaDriveCore.BUTTON_UP;
+            if((bits&8)!=0)md|=MegaDriveCore.BUTTON_DOWN;
+            if((bits&2)!=0)md|=MegaDriveCore.BUTTON_LEFT;
+            if((bits&1)!=0)md|=MegaDriveCore.BUTTON_RIGHT;
+            core.setButtons(md);
         } else core.setButtons(bits);
     }
 
