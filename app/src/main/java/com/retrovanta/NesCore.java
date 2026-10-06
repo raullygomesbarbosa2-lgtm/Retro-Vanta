@@ -127,7 +127,8 @@ final class NesCore implements EmulatorCore {
         int opcode=fetch(); int op=OP[opcode], mode=MODE[opcode], base=CYCLES[opcode];
         int address=0, crossed=0;
         if(mode!=IMP && mode!=ACC) { int[] result=address(mode); address=result[0];crossed=result[1]; }
-        int value=(mode==IMP||mode==ACC||mode==REL)?0:mode==IMM?address:read(address);
+        boolean writeOnly=op==STA||op==STX||op==STY;
+        int value=(mode==IMP||mode==ACC||mode==REL||writeOnly)?0:mode==IMM?address:read(address);
         switch(op){
             case ORA:a=(a|value)&255;setNZ(a);break; case AND:a=(a&value)&255;setNZ(a);break; case EOR:a=(a^value)&255;setNZ(a);break;
             case ADC:adc(value);break; case SBC:adc(value^255);break;
