@@ -55,7 +55,7 @@ public final class MegaDriveCoreSmokeTest {
 
     private byte[] cartridge(){
         byte[] b=new byte[0x400];
-        b[0]='S';b[1]='E';b[2]='G';b[3]='A';
+        b[0x100]='S';b[0x101]='E';b[0x102]='G';b[0x103]='A';
         byte[] name="HOME BREW TEST".getBytes();System.arraycopy(name,0,b,0x150,name.length);
         put32(b,0,0x00fffffc);put32(b,4,0x00000200);
         return b;
