@@ -86,7 +86,7 @@ final class MasterSystemCore implements EmulatorCore {
         }
     }
     private int cb(int op){int x=op>>>6,y=(op>>>3)&7,z=op&7,v=reg(z),out=v,carry;
-        if(x==0){carry=f&1;switch(y){case 0:carry=v>>>7;out=((v<<1)|(v>>>7))&255;break;case 1:carry=v&1;out=(v>>>1)|(carry<<7);break;case 2:{int c=f&1;carry=v>>>7;out=((v<<1)|c)&255;break;}case 3:{int c=f&1;carry=v&1;out=(v>>>1)|(c<<7);break;}case 4:carry=v>>>7;out=(v<<1)&255;break;case 5:carry=v&1;out=(v>>>1)|(v&0x80);break;case 6:out=((v<<4)|(v>>>4))&255;break;case 7:carry=v&1;out=v>>>1;break;}putReg(z,out);f=(out==0?0x40:0)|(out&0x80)|(carry?1:0);return z==6?15:8;}
+        if(x==0){carry=f&1;switch(y){case 0:carry=v>>>7;out=((v<<1)|(v>>>7))&255;break;case 1:carry=v&1;out=(v>>>1)|(carry<<7);break;case 2:{int c=f&1;carry=v>>>7;out=((v<<1)|c)&255;break;}case 3:{int c=f&1;carry=v&1;out=(v>>>1)|(c<<7);break;}case 4:carry=v>>>7;out=(v<<1)&255;break;case 5:carry=v&1;out=(v>>>1)|(v&0x80);break;case 6:out=((v<<4)|(v>>>4))&255;break;case 7:carry=v&1;out=v>>>1;break;}putReg(z,out);f=(out==0?0x40:0)|(out&0x80)|(carry!=0?1:0);return z==6?15:8;}
         if(x==1){f=(f&1)|0x10|((v&(1<<y))==0?0x40:0)|(y==7&&(v&0x80)!=0?0x80:0);return z==6?12:8;}
         putReg(z,x==2?v&~(1<<y):v|(1<<y));return z==6?15:8;
     }
