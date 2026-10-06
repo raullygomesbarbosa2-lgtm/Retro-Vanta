@@ -25,10 +25,10 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
       - name: Upload APK artifact
-        if: github.event_name == 'push'
+        if: success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-artifact@v4
         with:
-          name: Retro-Vanta-Original-DMG-APK
+          name: Retro-Vanta-Experimental-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Publish test release
