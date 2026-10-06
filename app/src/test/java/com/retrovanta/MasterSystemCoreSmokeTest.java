@@ -16,7 +16,7 @@ public final class MasterSystemCoreSmokeTest {
                 0x3e,0x30,0xd3,0xbe,                         // palette color 1 green
                 0x3e,0x00,0xd3,0xbf, 0x3e,0x40,0xd3,0xbf, // VRAM address 0, write
                 0x3e,0xff,0xd3,0xbe, 0xaf,0xd3,0xbe,0xd3,0xbe,0xd3,0xbe, // tile row, color 1
-                0xc3,0x00,0x00                             // loop through the short VDP setup program
+                0x18,0xfe                                  // stable idle loop after VDP setup
         });
         core.load(image);
         assertEquals(256,core.videoWidth()); assertEquals(192,core.videoHeight());
